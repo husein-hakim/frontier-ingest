@@ -1,0 +1,14 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.artifact-work/
+node_modules/
+node_modules
+data/
+outputs/
+tmp/
+*.db
+*.inspect.ndjson

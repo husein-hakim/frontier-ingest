@@ -1,0 +1,34 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: frontier
+      POSTGRES_USER: frontier
+      POSTGRES_PASSWORD: frontier-local
+    ports:
+      - "5432:5432"
+    volumes:
+      - frontier_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U frontier -d frontier"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  worker:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://frontier:frontier-local@postgres:5432/frontier
+      RAW_STORE_PATH: /data/raw
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    volumes:
+      - frontier_raw:/data/raw
+      - ./outputs:/app/outputs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["collect-all", "--catalog-limit", "1000", "--signal-limit", "500"]
+
+volumes:
+  frontier_postgres:
+  frontier_raw:
