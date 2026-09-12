@@ -50,61 +50,68 @@ const specs = [
   {
     name: "Startups",
     color: "#28536B",
-    note: "1,000 unique AI startups from the Y Combinator AI directory. Every row includes its canonical source URL and immutable raw-content hash.",
+    note: "1,000 unique AI startups. entityName is canonicalized while rawEntityName preserves the source spelling; every row carries source lineage.",
     columns: [
-      ["Schema Version", 14], ["Record Type", 14], ["Source", 22], ["Source URL", 38],
-      ["Startup Name", 24], ["Employee Count", 16], ["Website", 32], ["Description", 52],
-      ["Batch", 12], ["Status", 12], ["Tags", 35], ["Collected At", 22],
-      ["Content Hash", 26], ["Record Key", 26],
+      ["schemaVersion", 14], ["recordType", 14], ["source.name", 22], ["source.url", 38],
+      ["content.entityName", 24], ["content.rawEntityName", 24], ["content.data.employeeCount", 20],
+      ["content.website", 32], ["content.description", 52], ["content.batch", 12],
+      ["content.status", 12], ["content.tags", 35], ["collectedAt", 22],
+      ["source.contentHash", 26], ["recordKey", 26],
     ],
     data: startups.map((r) => [
-      r.schema_version, r.record_type, r.source.name, r.source.url,
-      value(r, "content.entityName", ""), value(r, "content.data.employeeCount", null),
+      r.schemaVersion, r.recordType, r.source.name, r.source.url,
+      value(r, "content.entityName", ""), value(r, "content.rawEntityName", ""),
+      value(r, "content.data.employeeCount", null),
       value(r, "content.website", ""), value(r, "content.description", ""),
       value(r, "content.batch", ""), value(r, "content.status", ""), text(value(r, "content.tags", [])),
-      date(r.collected_at), r.source.content_hash, r.record_key,
+      date(r.collectedAt), r.source.contentHash, r.recordKey,
     ]),
-    dateColumns: [11],
-    integerColumns: [5],
+    dateColumns: [12],
+    integerColumns: [6],
   },
   {
     name: "Products",
     color: "#5B5F97",
-    note: "1,000 primary AI products linked to canonical startups. Null pricing means the source did not support a safe classification.",
+    note: "1,000 genuine public AI applications from Hugging Face Spaces. Null pricing is an explicit abstention when no source evidence supports a pricing class.",
     columns: [
-      ["Schema Version", 14], ["Record Type", 14], ["Source", 22], ["Source URL", 38],
-      ["Product Name", 24], ["Startup Name", 24], ["Pricing Model", 16], ["Tagline", 38],
-      ["Website", 32], ["Description", 52], ["Batch", 12], ["Status", 12], ["Tags", 35],
-      ["Collected At", 22], ["Content Hash", 26], ["Record Key", 26],
+      ["schemaVersion", 14], ["recordType", 14], ["source.name", 22], ["source.url", 38],
+      ["content.productName", 26], ["content.startupName", 24], ["content.rawStartupName", 24],
+      ["content.pricingModel", 18], ["content.accessModel", 20], ["content.sdk", 14],
+      ["content.likes", 14], ["content.description", 52], ["content.tags", 35],
+      ["content.createdAt", 22], ["content.lastModified", 22], ["collectedAt", 22],
+      ["source.contentHash", 26], ["recordKey", 26],
     ],
     data: products.map((r) => [
-      r.schema_version, r.record_type, r.source.name, r.source.url,
+      r.schemaVersion, r.recordType, r.source.name, r.source.url,
       value(r, "content.productName", ""), value(r, "content.startupName", ""),
-      value(r, "content.pricingModel", ""), value(r, "content.tagline", ""),
-      value(r, "content.website", ""), value(r, "content.description", ""),
-      value(r, "content.batch", ""), value(r, "content.status", ""), text(value(r, "content.tags", [])),
-      date(r.collected_at), r.source.content_hash, r.record_key,
+      value(r, "content.rawStartupName", ""), value(r, "content.pricingModel", ""),
+      value(r, "content.accessModel", ""), value(r, "content.sdk", ""),
+      value(r, "content.likes", null), value(r, "content.description", ""),
+      text(value(r, "content.tags", [])), date(value(r, "content.createdAt", null)),
+      date(value(r, "content.lastModified", null)), date(r.collectedAt),
+      r.source.contentHash, r.recordKey,
     ]),
-    dateColumns: [13],
+    dateColumns: [13, 14, 15],
+    integerColumns: [10],
   },
   {
     name: "Research Papers",
     color: "#1B998B",
     note: "1,000 AI papers with associated GitHub repositories and star metrics. Star collection timestamps make the dynamic metric auditable.",
     columns: [
-      ["Schema Version", 14], ["Record Type", 18], ["Source", 22], ["Source URL", 38],
-      ["Title", 45], ["Authors", 45], ["Paper URL", 38], ["GitHub URL", 38],
-      ["GitHub Stars", 15], ["Stars Collected At", 22], ["Stars Source", 20],
-      ["Published Date", 20], ["Abstract", 55], ["Collected At", 22],
-      ["Content Hash", 26], ["Record Key", 26],
+      ["schemaVersion", 14], ["recordType", 18], ["source.name", 22], ["source.url", 38],
+      ["content.title", 45], ["content.authors", 45], ["content.paper_url", 38], ["content.github_url", 38],
+      ["content.github_stars", 18], ["content.github_stars_collected_at", 26],
+      ["content.github_stars_source", 24], ["content.published_date", 22],
+      ["content.abstract", 55], ["collectedAt", 22], ["source.contentHash", 26], ["recordKey", 26],
     ],
     data: papers.map((r) => [
-      r.schema_version, r.record_type, r.source.name, r.source.url,
+      r.schemaVersion, r.recordType, r.source.name, r.source.url,
       value(r, "content.title", ""), text(value(r, "content.authors", [])),
       value(r, "content.paper_url", ""), value(r, "content.github_url", ""),
       value(r, "content.github_stars", null), date(value(r, "content.github_stars_collected_at", null)),
       value(r, "content.github_stars_source", ""), date(value(r, "content.published_date", null)),
-      value(r, "content.abstract", ""), date(r.collected_at), r.source.content_hash, r.record_key,
+      value(r, "content.abstract", ""), date(r.collectedAt), r.source.contentHash, r.recordKey,
     ]),
     dateColumns: [9, 11, 13],
     integerColumns: [8],
@@ -114,41 +121,45 @@ const specs = [
     color: "#E76F51",
     note: "All AI-relevant jobs found across five monitored boards that were provably published within 24 hours of collection.",
     columns: [
-      ["Schema Version", 14], ["Record Type", 12], ["Source", 18], ["Source URL", 38],
-      ["Company", 24], ["Title", 38], ["Published At", 22], ["Remote", 12],
-      ["Role Family", 16], ["Location", 28], ["Full Text", 60], ["Freshness Status", 18],
-      ["Freshness Method", 24], ["Freshness Confidence", 20], ["Collected At", 22],
-      ["Content Hash", 26], ["Record Key", 26],
+      ["schemaVersion", 14], ["recordType", 12], ["source.name", 18], ["source.url", 38],
+      ["content.company", 24], ["content.rawCompany", 24], ["content.title", 38],
+      ["content.date", 22], ["content.is_remote", 16], ["content.role_family", 18],
+      ["content.location", 28], ["content.full_text", 60], ["content.freshness_status", 22],
+      ["content.freshness_method", 26], ["content.freshness_confidence", 24],
+      ["collectedAt", 22], ["source.contentHash", 26], ["recordKey", 26],
     ],
     data: jobs.map((r) => [
-      r.schema_version, r.record_type, r.source.name, r.source.url,
-      value(r, "content.company", ""), value(r, "content.title", ""),
-      date(value(r, "content.date", null)), value(r, "content.is_remote", false),
+      r.schemaVersion, r.recordType, r.source.name, r.source.url,
+      value(r, "content.company", ""), value(r, "content.rawCompany", ""),
+      value(r, "content.title", ""), date(value(r, "content.date", null)),
+      value(r, "content.is_remote", false),
       value(r, "content.role_family", ""), value(r, "content.location", ""),
       value(r, "content.full_text", ""), value(r, "content.freshness_status", ""),
       value(r, "content.freshness_method", ""), value(r, "content.freshness_confidence", null),
-      date(r.collected_at), r.source.content_hash, r.record_key,
+      date(r.collectedAt), r.source.contentHash, r.recordKey,
     ]),
-    dateColumns: [6, 14],
-    percentageColumns: [13],
+    dateColumns: [7, 15],
+    percentageColumns: [14],
   },
   {
     name: "News",
     color: "#D4A017",
     note: "All AI news found across five monitored feeds that was provably published within 24 hours, with full article text and freshness evidence.",
     columns: [
-      ["Schema Version", 14], ["Record Type", 12], ["Source", 20], ["Source URL", 38],
-      ["Title", 45], ["Publisher", 22], ["Authors", 30], ["Published At", 22],
-      ["Full Text", 60], ["Freshness Status", 18], ["Freshness Method", 24],
-      ["Freshness Confidence", 20], ["Collected At", 22], ["Content Hash", 26], ["Record Key", 26],
+      ["schemaVersion", 14], ["recordType", 12], ["source.name", 20], ["source.url", 38],
+      ["content.title", 45], ["content.publisher", 22], ["content.authors", 30],
+      ["content.published_at", 24], ["content.full_text", 60],
+      ["content.freshness_status", 22], ["content.freshness_method", 26],
+      ["content.freshness_confidence", 24], ["collectedAt", 22],
+      ["source.contentHash", 26], ["recordKey", 26],
     ],
     data: news.map((r) => [
-      r.schema_version, r.record_type, r.source.name, r.source.url,
+      r.schemaVersion, r.recordType, r.source.name, r.source.url,
       value(r, "content.title", ""), value(r, "content.publisher", ""),
       text(value(r, "content.authors", [])), date(value(r, "content.published_at", null)),
       value(r, "content.full_text", ""), value(r, "content.freshness_status", ""),
       value(r, "content.freshness_method", ""), value(r, "content.freshness_confidence", null),
-      date(r.collected_at), r.source.content_hash, r.record_key,
+      date(r.collectedAt), r.source.contentHash, r.recordKey,
     ]),
     dateColumns: [7, 12],
     percentageColumns: [11],
@@ -207,8 +218,9 @@ for (const [sheetIndex, spec] of specs.entries()) {
   headerRange.values = [spec.columns.map(([label]) => label)];
   headerRange.format.fill = "#E8EAED";
   headerRange.format.font = { bold: true, color: "#202124" };
-  headerRange.format.rowHeight = 24;
+  headerRange.format.rowHeight = 36;
   headerRange.format.verticalAlignment = "center";
+  headerRange.format.wrapText = true;
 
   if (spec.data.length) {
     const dataRange = sheet.getRange(`A5:${lastColumn}${lastRow}`);
@@ -246,7 +258,7 @@ for (const [sheetIndex, spec] of specs.entries()) {
   }
 
   if (spec.name === "Jobs" || spec.name === "News") {
-    const statusColumn = spec.name === "Jobs" ? "L" : "J";
+    const statusColumn = spec.name === "Jobs" ? "M" : "J";
     sheet.getRange(`${statusColumn}5:${statusColumn}${lastRow}`).conditionalFormats.add(
       "containsText",
       { text: "VERIFIED", format: { fill: "#DCFCE7", font: { color: "#166534", bold: true } } },
@@ -261,6 +273,8 @@ for (const [sheetIndex, spec] of specs.entries()) {
   sheet.freezePanes.freezeRows(4);
   sheet.freezePanes.freezeColumns(Math.min(4, spec.columns.length));
 }
+
+await workbook.recalculate();
 
 await fs.mkdir(previewDir, { recursive: true });
 const inspection = await workbook.inspect({

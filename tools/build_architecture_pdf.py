@@ -81,7 +81,7 @@ def draw_footer(c: Canvas) -> None:
     c.setFont("Helvetica", 7)
     c.setFillColor(MUTED)
     c.drawString(34, 16, "Interview submission architecture - evidence-gated, idempotent and source-compliant")
-    c.drawRightString(PAGE_W - 34, 16, "Generated 29 Aug 2026")
+    c.drawRightString(PAGE_W - 34, 16, "Verified 12 Sep 2026")
 
 
 def draw_arrow(c: Canvas, x1: float, y: float, x2: float, color=BLUE) -> None:
@@ -122,14 +122,14 @@ def page_one(c: Canvas) -> None:
     draw_wrapped(c, "Strict timestamp proof: all qualifying jobs and news from the last 24 hours.", 530, y_lane - 12, 265, size=8)
 
     stages = [
-        ("1", "Discover", "APIs, feeds, pagination", PALE_BLUE),
+        ("1", "Discover + enqueue", "APIs, feeds, stable dedupe keys", PALE_BLUE),
         ("2", "Fetch once", "Rate limits, retries, block detection", LIGHT),
         ("3", "Raw evidence", "SHA-256 content store", PALE_TEAL),
         ("4", "Extract", "JSON, feeds, JSON-LD, HTML", LIGHT),
         ("5", "Evidence gate", "Only unresolved fields continue", PALE_ORANGE),
         ("6", "Targeted LLM", "Small fragments, typed output", PALE_TEAL),
         ("7", "Validate + link", "Freshness, schema, entities", LIGHT),
-        ("8", "Upsert + export", "Postgres, JSON, six Sheet tabs", PALE_BLUE),
+        ("8", "Ack + export", "Idempotent upsert, metrics, six tabs", PALE_BLUE),
     ]
     left = 34
     gap = 9
@@ -212,15 +212,16 @@ def page_two(c: Canvas) -> None:
     widths = [74, 175, 206, 313]
     table_row(c, x, y, widths, ["Dataset", "Primary sources", "Captured evidence", "Access and validation"], 24, header=True)
     rows = [
-        ["Startups + products", "Y Combinator AI company directory", "Name, employee count, website, description, product, batch, status", "Paginated public directory; canonical company URL; deterministic parsing."],
+        ["Startups", "Y Combinator AI company directory", "Canonical + raw name, team size, website, description, batch and status", "Paginated public directory; one canonical company URL per record."],
+        ["AI products", "Hugging Face Spaces public API", "Product title, publisher, description, tags, SDK, likes and timestamps", "Cursor pagination; one genuine hosted AI application per record; pricing abstains without evidence."],
         ["Research papers", "Hugging Face daily papers + arXiv + GitHub GraphQL", "Title, authors, abstract, paper URL, repository URL, stars and star timestamp", "Code-linked papers only; GitHub enrichment batched up to 40 repositories per call."],
         ["AI jobs", "Arbeitnow, Remote OK, Jobicy, Himalayas, Remotive", "Company, title, published time, remote flag, location and full description", "Five official/public APIs; provable age <= 24h; source-specific attribution honored."],
         ["AI news", "OpenAI, DeepMind, Hugging Face, MIT News AI, TechCrunch AI", "Title, publisher, authors, published time and full article text", "RSS/Atom discovery followed by one compliant article fetch; age <= 24h."],
     ]
     y -= 24
     for row in rows:
-        table_row(c, x, y, widths, row, 40)
-        y -= 40
+        table_row(c, x, y, widths, row, 34)
+        y -= 34
 
     lower_y = 64
     left_w = 375
@@ -251,10 +252,10 @@ def page_two(c: Canvas) -> None:
     c.setFont("Helvetica-Bold", 11)
     c.drawString(right_x + 16, lower_y + 202, "Access policy and anti-bot boundary")
     policy = [
-        "Priority: official API -> RSS/Atom -> sitemap -> permitted HTTP -> browser rendering only when allowed.",
+        "Priority: official API -> RSS/Atom -> sitemap -> permitted HTTP -> allowlisted browser rendering only when authorized.",
         "Per-host concurrency, minimum delays, exponential retry and jitter prevent accidental overload.",
         "Robots rules, terms, cache headers and attribution are source configuration, not ad hoc code.",
-        "Block-page signatures pause the adapter. The system never bypasses CAPTCHA or access controls.",
+        "The executable Playwright adapter accepts authorized session state; challenge signatures stop it immediately.",
         "Raw-response hashes deduplicate downloads and allow parser replays without touching the source again.",
     ]
     yy = lower_y + 174
@@ -265,8 +266,8 @@ def page_two(c: Canvas) -> None:
 
     c.setFillColor(MUTED)
     c.setFont("Helvetica", 6.6)
-    c.drawString(34, 55, "Representative endpoints: ycombinator.com/companies/industry/ai | huggingface.co/api/daily_papers | api.github.com/graphql")
-    c.drawString(34, 44, "Freshness inputs: arbeitnow.com/api/job-board-api | remoteok.com/api | jobicy.com/jobs-rss-feed | remotive.com/api/remote-jobs")
+    c.drawString(34, 55, "Representative endpoints: ycombinator.com/companies/industry/ai | huggingface.co/api/spaces | huggingface.co/api/daily_papers")
+    c.drawString(34, 44, "Freshness inputs: arbeitnow.com/api/job-board-api | remoteok.com/api | jobicy.com/api/v2/remote-jobs | remotive.com/api/remote-jobs")
     draw_footer(c)
     c.showPage()
 
@@ -284,9 +285,9 @@ def page_three(c: Canvas) -> None:
 
     top_y = PAGE_H - 200
     nodes = [
-        (34, 116, "Schedulers", "catalog + freshness\ncheckpoints", PALE_BLUE),
-        (169, 126, "Durable queue", "source, page, priority,\nattempt", LIGHT),
-        (314, 126, "Stateless workers", "bounded async fetch +\nparse", PALE_TEAL),
+        (34, 116, "Producers", "catalog + freshness\ndiscovery", PALE_BLUE),
+        (169, 126, "Durable queue", "dedupe key, lease,\nattempt", LIGHT),
+        (314, 126, "Stateless workers", "enrich + resolve +\nvalidate", PALE_TEAL),
         (459, 142, "Object storage", "content-addressed raw\nevidence", LIGHT),
         (620, 188, "PostgreSQL", "leases, records, mappings,\nquality events", PALE_BLUE),
     ]
@@ -305,9 +306,9 @@ def page_three(c: Canvas) -> None:
             draw_arrow(c, x + width, top_y + 38, next_x)
 
     cards = [
-        (34, "Capacity", ["Pages stream; no full-dataset memory load.", "500-2,000 row database batches.", "Autoscale on queue lag and oldest-item age."], BLUE),
-        (302, "Correctness", ["Stable key + unique constraint = idempotency.", "Postgres SKIP LOCKED leases prevent double work.", "Dead-letter queue retains raw evidence and error."], TEAL),
-        (570, "Operations", ["Metrics by source: latency, 429s, blocks, yield.", "Separate provider token and request budgets.", "Reprocess from raw hashes after parser upgrades."], ORANGE),
+        (34, "Capacity", ["Pages stream; no full-dataset memory load.", "500k hot path: 2,500 batches; 0.002 MiB traced peak.", "Autoscale on queue lag and oldest-item age."], BLUE),
+        (302, "Correctness", ["Stable key + unique constraint = idempotency.", "SKIP LOCKED leases + queue-order-independent reconciliation.", "Canonical output preserves the raw source name."], TEAL),
+        (570, "Operations", ["Persist source yield, queue, HTTP and LLM metrics.", "413 shrinks payload; 429 backs off then falls back.", "Dead letters retain raw evidence and error."], ORANGE),
     ]
     card_y = 252
     card_w = 238
@@ -334,17 +335,17 @@ def page_three(c: Canvas) -> None:
 
     c.setFillColor(INK)
     c.setFont("Helvetica-Bold", 12)
-    c.drawString(34, 224, "Submission quality gate - clean run on 29 Aug 2026")
+    c.drawString(34, 224, "Submission quality gate - final verified run on 12 Sep 2026")
     x = 34
     y = 208
     widths = [174, 78, 92, 123, 123, 178]
     table_row(c, x, y, widths, ["Dataset", "Rows", "Unique keys", "Valid source URLs", "Evidence complete", "Result"], 23, header=True)
     quality_rows = [
         ["AI startups", "1,000", "1,000", "1,000", "1,000", "PASS"],
-        ["AI products", "1,000", "1,000", "1,000", "1,000", "PASS"],
+        ["Genuine AI products", "1,000", "1,000", "1,000", "1,000", "PASS"],
         ["Research papers + code", "1,000", "1,000", "1,000", "1,000", "PASS"],
-        ["AI jobs, verified <= 24h", "65", "65", "65", "65", "PASS"],
-        ["AI news, verified <= 24h", "5", "5", "5", "5", "PASS"],
+        ["AI jobs, verified <= 24h", "67", "67", "67", "67", "PASS"],
+        ["AI news, verified <= 24h", "11", "11", "11", "11", "PASS"],
     ]
     y -= 23
     for row in quality_rows:
@@ -353,7 +354,7 @@ def page_three(c: Canvas) -> None:
 
     c.setFillColor(MUTED)
     c.setFont("Helvetica-Oblique", 7)
-    c.drawString(34, 54, "Freshness counts intentionally vary by run. Records without provable timestamps are excluded, not guessed.")
+    c.drawString(34, 54, "Fail-closed rules enforced: direct GitHub metrics must be <= 24h old; unverifiable signal dates are excluded.")
     draw_footer(c)
     c.showPage()
 

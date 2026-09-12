@@ -1,0 +1,81 @@
+{
+  "schemaVersion": "1.1",
+  "runDate": "2026-09-12",
+  "database": "sqlite:///data/final-submission.db",
+  "recordCounts": {
+    "STARTUP": 1000,
+    "PRODUCT": 1000,
+    "RESEARCH_PAPER": 1000,
+    "JOB": 67,
+    "NEWS": 11
+  },
+  "queue": {
+    "name": "final-20260911",
+    "discovered": 3047,
+    "claimed": 3047,
+    "completed": 3047,
+    "retried": 0,
+    "deadLettered": 0
+  },
+  "http": {
+    "requests": 114,
+    "retries": 0,
+    "failures": 0,
+    "blocks": 0,
+    "bytesReceived": 39066650
+  },
+  "sourceYields": {
+    "jobs": {
+      "Arbeitnow": 35,
+      "Remote OK": 0,
+      "Jobicy": 10,
+      "Himalayas": 4,
+      "Remotive": 0
+    },
+    "news": {
+      "OpenAI News": 2,
+      "Google DeepMind": 0,
+      "Hugging Face Blog": 0,
+      "MIT News AI": 1,
+      "TechCrunch AI": 8
+    }
+  },
+  "entityResolution": {
+    "mappingRows": 1573,
+    "matched": 1008,
+    "needsReview": 12,
+    "newEntity": 553,
+    "productCanonicalNamesWritten": 29,
+    "jobCanonicalNamesWritten": 1
+  },
+  "llmResilienceDemo": {
+    "simulation": true,
+    "payload413Shrank": true,
+    "rateLimitFallbackRecovered": true,
+    "exactQuoteEvidenceAccepted": true
+  },
+  "renderedSourceDemo": {
+    "simulation": false,
+    "allowedHostOnly": true,
+    "javascriptExecuted": true,
+    "rawEvidenceStored": true,
+    "challengeBypassAttempted": false
+  },
+  "githubDirectRefresh": {
+    "paperRecords": 1000,
+    "starMetricsRefreshed": 1000,
+    "unavailableRepositories": 0,
+    "graphqlRequests": 25,
+    "retries": 0,
+    "failures": 0
+  },
+  "qualityGate": {
+    "schema": "PASS",
+    "catalogCounts": "PASS",
+    "uniqueKeysAndUrls": "PASS",
+    "fieldEvidence": "PASS",
+    "signalFreshness": "PASS",
+    "directGitHubStars": "PASS",
+    "submissionReady": true
+  }
+}

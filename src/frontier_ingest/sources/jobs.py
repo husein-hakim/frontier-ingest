@@ -82,6 +82,7 @@ class JobSignalsAdapter:
         self.raw_store = raw_store
         self.sources = sources
         self.source_errors: dict[str, str] = {}
+        self.source_yields: dict[str, int] = {source.name: 0 for source in sources}
 
     async def collect(self, limit: int) -> AsyncIterator[CanonicalRecord]:
         emitted = 0
@@ -90,7 +91,8 @@ class JobSignalsAdapter:
         source_batches = await asyncio.gather(
             *(self._collect_source(source, per_source_limit) for source in self.sources)
         )
-        for records in source_batches:
+        for source, records in zip(self.sources, source_batches, strict=True):
+            self.source_yields[source.name] = len(records)
             for record in records:
                 if record.record_key in seen:
                     continue

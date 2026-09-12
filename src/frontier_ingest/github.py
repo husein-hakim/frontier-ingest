@@ -20,7 +20,8 @@ class GitHubEnricher:
         self.http = http
         self.token = token
 
-    async def enrich(self, records: list[CanonicalRecord], batch_size: int = 40) -> None:
+    async def enrich(self, records: list[CanonicalRecord], batch_size: int = 40) -> int:
+        updated_records = 0
         repositories: dict[tuple[str, str], list[CanonicalRecord]] = {}
         for record in records:
             match = REPO_URL.match(str(record.content.get("github_url") or ""))
@@ -43,7 +44,7 @@ class GitHubEnricher:
                 detect_blocks=False,
             )
             payload = __import__("json").loads(response.body)
-            if payload.get("errors"):
+            if payload.get("errors") and not payload.get("data"):
                 raise RuntimeError(f"GitHub GraphQL error: {payload['errors']}")
             collected_at = datetime.now(UTC).isoformat()
             data = payload.get("data", {})
@@ -52,6 +53,14 @@ class GitHubEnricher:
                 if not repo:
                     continue
                 for record in repositories[key]:
+                    refreshed_fields = {
+                        "github_stars",
+                        "github_stars_collected_at",
+                        "github_stars_source",
+                    }
+                    record.evidence = [
+                        item for item in record.evidence if item.field not in refreshed_fields
+                    ]
                     record.content["github_stars"] = int(repo["stargazerCount"])
                     record.content["github_stars_collected_at"] = collected_at
                     record.content["github_stars_source"] = "github_graphql"
@@ -77,6 +86,8 @@ class GitHubEnricher:
                             ),
                         ]
                     )
+                    updated_records += 1
+        return updated_records
 
     @staticmethod
     def _query(

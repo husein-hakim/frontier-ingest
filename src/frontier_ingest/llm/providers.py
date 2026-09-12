@@ -61,13 +61,17 @@ class OpenAICompatibleProvider(ExtractionProvider):
                     ],
                 },
                 detect_blocks=False,
+                max_attempts=1,
             )
         except FetchError as error:
-            if isinstance(error.__cause__, HttpStatusError) and error.__cause__.status == 413:
+            status_error = error.__cause__ if isinstance(error.__cause__, HttpStatusError) else None
+            if status_error and status_error.status == 413:
                 raise PayloadTooLargeError(str(error)) from error
+            if status_error and status_error.status not in {408, 425, 429, 500, 502, 503, 504}:
+                raise PermanentProviderError(str(error)) from error
             retry_after = None
-            if isinstance(error.__cause__, HttpStatusError):
-                value = error.__cause__.headers.get("retry-after")
+            if status_error:
+                value = status_error.headers.get("retry-after")
                 try:
                     retry_after = float(value) if value else None
                 except ValueError:

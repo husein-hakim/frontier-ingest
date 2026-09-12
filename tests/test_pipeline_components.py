@@ -6,6 +6,8 @@ import unittest
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from frontier_ingest.config import Settings
+from frontier_ingest.core.raw_store import ContentAddressedRawStore
 from frontier_ingest.extraction import html_to_text, parse_absolute_timestamp
 from frontier_ingest.github import GitHubEnricher
 from frontier_ingest.models import (
@@ -15,10 +17,14 @@ from frontier_ingest.models import (
     RecordType,
     SourceRef,
 )
+from frontier_ingest.pipeline import IngestionPipeline
 from frontier_ingest.quality import submission_gate, validate_payloads
 from frontier_ingest.sources.huggingface_papers import HuggingFacePapersAdapter
+from frontier_ingest.sources.huggingface_spaces import HuggingFaceSpacesAdapter
+from frontier_ingest.sources.rendered import AuthorizedRenderedFetcher
 from frontier_ingest.sources.yc import YCDirectoryAdapter
 from frontier_ingest.storage import SQLiteStore
+from frontier_ingest.storage_postgres import decode_json_object
 
 
 class ExtractionTests(unittest.TestCase):
@@ -57,6 +63,25 @@ class SourceParsingTests(unittest.TestCase):
         self.assertEqual(variables["owner0"], "openai")
         self.assertEqual(aliases["repo0"], ("openai", "example"))
 
+    def test_space_record_is_a_real_product_not_a_relabelled_company(self) -> None:
+        adapter = HuggingFaceSpacesAdapter(None, None)  # type: ignore[arg-type]
+        record = adapter._record(
+            {
+                "id": "acme-labs/voice-studio",
+                "cardData": {"title": "Voice Studio"},
+                "short_description": "Generate narrated audio.",
+                "private": False,
+                "likes": 42,
+                "tags": ["audio"],
+                "sdk": "gradio",
+            },
+            "hash",
+            datetime.now(UTC),
+        )
+        self.assertEqual(record.content["productName"], "Voice Studio")
+        self.assertEqual(record.content["startupName"], "acme-labs")
+        self.assertNotEqual(record.content["productName"], record.content["startupName"])
+
 
 class StorageTests(unittest.IsolatedAsyncioTestCase):
     async def test_record_upsert_is_idempotent(self) -> None:
@@ -66,6 +91,10 @@ class StorageTests(unittest.IsolatedAsyncioTestCase):
             await store.upsert_record(_record())
             await store.upsert_record(_record())
             self.assertEqual(await store.count_records(), {"STARTUP": 1})
+
+    async def test_postgres_jsonb_decoder_handles_default_asyncpg_strings(self) -> None:
+        self.assertEqual(decode_json_object('{"recordKey":"one"}'), {"recordKey": "one"})
+        self.assertEqual(decode_json_object({"recordKey": "two"}), {"recordKey": "two"})
 
     async def test_queue_deduplicates_and_leases(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -111,6 +140,46 @@ class StorageTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(deleted, 1)
             self.assertEqual(await store.count_records(), {})
 
+    async def test_second_pass_writes_canonical_and_preserves_raw_name(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "test.db"
+            pipeline = IngestionPipeline(
+                Settings(
+                    database_url=f"sqlite:///{database}",
+                    raw_store_path=Path(directory) / "raw",
+                )
+            )
+            await pipeline.initialize()
+            startup = _record()
+            product = CanonicalRecord(
+                record_key="product-1",
+                record_type=RecordType.PRODUCT,
+                source=startup.source,
+                content={
+                    "productName": "Acme Studio",
+                    "startupName": "Acme AI, Inc.",
+                    "pricingModel": None,
+                },
+                evidence=[
+                    FieldEvidence("productName", EvidenceMethod.API, startup.source.url, "product"),
+                    FieldEvidence("startupName", EvidenceMethod.API, startup.source.url, "company"),
+                ],
+            )
+            await pipeline.store.upsert_records([startup, product])
+            self.assertEqual(await pipeline.reconcile_entities(), 2)
+            payload = (await pipeline.store.iter_payloads(RecordType.PRODUCT))[0]
+            self.assertEqual(payload["content"]["startupName"], "Acme AI")
+            self.assertEqual(payload["content"]["rawStartupName"], "Acme AI, Inc.")
+
+    async def test_rendered_fetch_requires_explicit_host_allowlist(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fetcher = AuthorizedRenderedFetcher(
+                ContentAddressedRawStore(Path(directory)),
+                {"allowed.example"},
+            )
+            with self.assertRaises(PermissionError):
+                await fetcher.fetch("https://blocked.example/page")
+
 
 class QualityTests(unittest.TestCase):
     def test_missing_required_field_blocks_submission(self) -> None:
@@ -128,14 +197,20 @@ def _record() -> CanonicalRecord:
         record_key="record-1",
         record_type=RecordType.STARTUP,
         source=SourceRef("fixture", "https://example.com/acme", now, "abc"),
-        content={"entityName": "Acme AI"},
+        content={"entityName": "Acme AI", "rawEntityName": "Acme AI"},
         evidence=[
             FieldEvidence(
                 "entityName",
                 EvidenceMethod.API,
                 "https://example.com/acme",
                 "fixture.name",
-            )
+            ),
+            FieldEvidence(
+                "rawEntityName",
+                EvidenceMethod.API,
+                "https://example.com/acme",
+                "fixture.name",
+            ),
         ],
     )
 

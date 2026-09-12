@@ -1,0 +1,12 @@
+{
+  "simulation": false,
+  "source": "local authorized JavaScript fixture",
+  "allowedHost": "127.0.0.1",
+  "javascriptExecuted": true,
+  "challengeBypassAttempted": false,
+  "finalUrl": "http://127.0.0.1:49597/product",
+  "title": "Rendered AI Product",
+  "contentHash": "c4383137846fc3a9076e349564e1bb765fb87f85bff52f960fbf60d45b5af37f",
+  "rawEvidenceStored": true,
+  "htmlBytes": 283
+}

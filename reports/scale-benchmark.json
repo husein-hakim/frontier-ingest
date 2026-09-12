@@ -1,0 +1,11 @@
+{
+  "benchmark": "streaming-key-and-batch-hot-path",
+  "records": 500000,
+  "batch_size": 200,
+  "batches": 2500,
+  "elapsed_seconds": 0.8439,
+  "records_per_second": 592491,
+  "peak_memory_mib": 0.002,
+  "checksum": "1ed8c3dc42156761c2d909c928a408cda5eb7450d98bcd66ff406d481df765f1",
+  "scope_note": "Microbenchmark of bounded-memory transformation only; source latency, PostgreSQL I/O, and external rate limits are intentionally excluded."
+}

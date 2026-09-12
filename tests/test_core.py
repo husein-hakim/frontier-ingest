@@ -39,6 +39,25 @@ class HashingTests(unittest.TestCase):
     def test_stable_key_is_repeatable(self) -> None:
         self.assertEqual(stable_key("arxiv", "1234"), stable_key("arxiv", "1234"))
 
+    def test_public_record_contract_is_camel_case_and_round_trips(self) -> None:
+        now = datetime.now(UTC)
+        record = CanonicalRecord(
+            record_key="startup-1",
+            record_type=RecordType.STARTUP,
+            source=SourceRef("fixture", "https://example.com", now, "abc"),
+            content={"entityName": "Acme", "rawEntityName": "Acme"},
+            evidence=[
+                FieldEvidence("entityName", EvidenceMethod.API, "https://example.com", "name"),
+                FieldEvidence("rawEntityName", EvidenceMethod.API, "https://example.com", "name"),
+            ],
+        )
+        payload = record.to_dict()
+        self.assertIn("schemaVersion", payload)
+        self.assertIn("recordType", payload)
+        self.assertIn("collectedAt", payload)
+        self.assertNotIn("schema_version", payload)
+        self.assertEqual(CanonicalRecord.from_dict(payload).record_key, record.record_key)
+
 
 class TokenBudgetTests(unittest.TestCase):
     def test_relevant_fragment_wins_under_budget(self) -> None:

@@ -29,6 +29,8 @@ class LLMEnrichmentStats:
     applied_fields: int = 0
     rejected_fields: int = 0
     failures: int = 0
+    provider_attempts: int = 0
+    selected_fragments: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,6 +103,8 @@ class EvidenceGatedLLMEnricher:
             return record
 
         envelope = result.data
+        self.stats.provider_attempts += result.attempts
+        self.stats.selected_fragments += result.selected_fragments
         values = envelope.get("values") if isinstance(envelope.get("values"), dict) else {}
         evidence = envelope.get("evidence") if isinstance(envelope.get("evidence"), dict) else {}
         for field in task.allowed_values:
@@ -145,6 +149,17 @@ class EvidenceGatedLLMEnricher:
                 )
                 if part.split(":", 1)[-1].strip()
             )
+            pricing_terms = {
+                "free",
+                "freemium",
+                "paid",
+                "pricing",
+                "subscription",
+                "enterprise",
+                "plan",
+            }
+            if not any(term in document.casefold() for term in pricing_terms):
+                return None
             return EnrichmentTask(
                 document=document,
                 schema={

@@ -10,7 +10,7 @@ class Settings:
     database_url: str = "sqlite:///data/frontier.db"
     raw_store_path: Path = Path("data/raw")
     output_path: Path = Path("outputs")
-    user_agent: str = "frontier-ingest/0.2 interview-assessment"
+    user_agent: str = "frontier-ingest/1.0 interview-assessment"
     github_token: str | None = None
     huggingface_token: str | None = None
     product_hunt_token: str | None = None

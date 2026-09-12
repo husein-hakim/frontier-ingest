@@ -15,19 +15,46 @@ services:
       timeout: 3s
       retries: 10
 
-  worker:
+  producer:
     build: .
     environment:
       DATABASE_URL: postgresql://frontier:frontier-local@postgres:5432/frontier
       RAW_STORE_PATH: /data/raw
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      HUGGINGFACE_TOKEN: ${HUGGINGFACE_TOKEN:-}
     volumes:
       - frontier_raw:/data/raw
       - ./outputs:/app/outputs
     depends_on:
       postgres:
         condition: service_healthy
-    command: ["collect-all", "--catalog-limit", "1000", "--signal-limit", "500"]
+    command:
+      ["produce-all", "--catalog-limit", "1000", "--signal-limit", "500", "--queue-name", "submission"]
+
+  worker:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://frontier:frontier-local@postgres:5432/frontier
+      RAW_STORE_PATH: /data/raw
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      ENABLE_LLM_ENRICHMENT: ${ENABLE_LLM_ENRICHMENT:-false}
+      PRIMARY_LLM_API_KEY: ${PRIMARY_LLM_API_KEY:-}
+      PRIMARY_LLM_BASE_URL: ${PRIMARY_LLM_BASE_URL:-}
+      PRIMARY_LLM_MODEL: ${PRIMARY_LLM_MODEL:-}
+      SECONDARY_LLM_API_KEY: ${SECONDARY_LLM_API_KEY:-}
+      SECONDARY_LLM_BASE_URL: ${SECONDARY_LLM_BASE_URL:-}
+      SECONDARY_LLM_MODEL: ${SECONDARY_LLM_MODEL:-}
+      TERTIARY_LLM_API_KEY: ${TERTIARY_LLM_API_KEY:-}
+      TERTIARY_LLM_BASE_URL: ${TERTIARY_LLM_BASE_URL:-}
+      TERTIARY_LLM_MODEL: ${TERTIARY_LLM_MODEL:-}
+    volumes:
+      - frontier_raw:/data/raw
+      - ./outputs:/app/outputs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command:
+      ["work", "--queue-name", "submission", "--batch-size", "100", "--idle-polls", "60", "--poll-interval", "2"]
 
 volumes:
   frontier_postgres:

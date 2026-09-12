@@ -8,7 +8,7 @@ The governing invariant is: a populated canonical field must have field-level ev
 
 ## Processing stages
 
-1. Source adapters discover pages or stable resource identifiers.
+1. Source adapters discover pages or stable resource identifiers and producers enqueue records with deterministic dedupe keys.
 2. The HTTP client applies per-host concurrency, spacing, timeouts, block detection, and bounded retries.
 3. Raw bytes are written under their SHA-256 hash before extraction.
 4. Deterministic extractors consume APIs, feeds, JSON-LD, metadata, and HTML.
@@ -16,9 +16,10 @@ The governing invariant is: a populated canonical field must have field-level ev
 6. The token budgeter ranks complete fragments and enforces a provider-safe limit.
 7. Up to three LLM providers are tried in order with isolated retry budgets.
 8. Typed values must include exact source quotes; unsupported values are discarded.
-9. Freshness, schema, URL, uniqueness, and field-evidence validation run before persistence.
-10. Entity resolution performs exact normalization, blocked fuzzy matching, or abstention.
-11. Bounded batches are upserted and exported to the six requested data tabs.
+9. Workers claim expiring leases, then freshness, schema, URL, uniqueness, and field-evidence validation run before persistence.
+10. Entity resolution performs exact normalization, blocked fuzzy matching, or abstention and writes matched canonical names.
+11. Bounded batches are idempotently upserted; a second reconciliation pass removes queue-order dependence.
+12. JSON, a run manifest, metrics, and the six requested Sheet tabs are exported.
 
 ## 413 and 429 behavior
 
@@ -38,7 +39,7 @@ Distributed nodes use stable record keys, unique database constraints, work-item
 
 Names are normalized with NFKC Unicode normalization, case folding, alphanumeric tokenization, and legal-suffix removal. Exact normalized lookup is O(1). Fuzzy matching uses prefix, token-count, and length blocks, capped at 200 candidates, before `SequenceMatcher` scoring. Scores above the match threshold merge; the review band is logged as `NEEDS_REVIEW`; low scores become `NEW_ENTITY`.
 
-The resolver starts with 50 seed organizations and augments the index with collected startup names. Products and job companies are resolved against that same index.
+The resolver starts with 50 seed organizations and augments the index with collected startup names. Products and job companies are resolved against that same index. A matched canonical value replaces the normalized output field while `rawEntityName`, `rawStartupName`, or `rawCompany` retains the source spelling. `NEEDS_REVIEW` values are never silently merged.
 
 ## Storage strategy
 
@@ -52,16 +53,16 @@ Raw responses belong in object storage under their content hash. Keeping raw evi
 
 The executable reference path streams records and writes 200-record batches. It does not collect the full dataset in memory. GitHub enrichment batches up to 40 repositories per GraphQL request, and entity resolution avoids all-pairs comparison.
 
-The production topology separates discovery from processing with a durable queue. Stateless workers claim expiring leases and autoscale on queue lag. Source partitions and checkpoints make large directory scans resumable. Database writes use bounded transactions, raw bodies go to object storage, and dead letters preserve the error plus raw evidence.
+The executable topology separates discovery from processing with `produce`, `produce-all`, and `work` commands. Stateless workers claim expiring leases and autoscale on queue lag. Source partitions and checkpoints make large directory scans resumable. Database writes use bounded transactions, raw bodies go to object storage, and dead letters preserve the error plus raw evidence.
 
 Scale comes from adding workers, source partitions, database IOPS, and object-storage throughput. Per-domain policies remain fixed; the system does not gain throughput by violating a source's rate limit.
 
 ## Protected sources
 
-The source order is official API, RSS/Atom, sitemap, permitted HTTP, and authorized JavaScript rendering. Recognized Cloudflare, DataDome, or CAPTCHA pages stop that adapter and surface an operational error. A production integration for a protected high-value source requires authorized access or a licensed feed. CAPTCHA circumvention is outside the system's safety and compliance boundary.
+The source order is official API, RSS/Atom, sitemap, permitted HTTP, and authorized JavaScript rendering. The optional Playwright adapter requires an explicit hostname allowlist, accepts only a user-authorized browser storage state, saves rendered HTML in the raw store, and refuses recognized Cloudflare, DataDome, or CAPTCHA pages. A protected high-value source requires authorized access or a licensed feed. CAPTCHA circumvention is outside the system's safety and compliance boundary.
 
 ## Observability and failure recovery
 
-Collection summaries expose requests, retries, failures, block detections, bytes, LLM candidates, calls, accepted fields, rejected fields, and per-source errors. Production metrics should additionally track queue lag, oldest work age, source yield, freshness rejection reason, token consumption, entity-review rate, and dead-letter volume.
+Every run persists requests, retries, failures, block detections, bytes, per-source yields/errors, queue states, LLM candidates/calls, accepted/rejected fields, reconciliation count, and dead-letter volume. The exported run manifest exposes configuration status without secrets. Production should additionally alert on queue lag, oldest work age, freshness rejection reason, token consumption, and entity-review rate.
 
 Because raw bytes and stable keys survive failure, every stage can retry independently. Reprocessing after a parser upgrade reads content hashes rather than revisiting source sites.

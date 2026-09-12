@@ -135,14 +135,16 @@ class ResilientHttpClient:
         headers: dict[str, str] | None = None,
         json: Any | None = None,
         detect_blocks: bool = True,
+        max_attempts: int | None = None,
     ) -> FetchResult:
         if self._session is None:
             raise RuntimeError("ResilientHttpClient must be used as an async context manager")
         controller = self._controller(url)
+        attempt_limit = max(1, max_attempts or self.max_attempts)
         started = time.monotonic()
         last_error: Exception | None = None
         async with controller.semaphore:
-            for attempt in range(1, self.max_attempts + 1):
+            for attempt in range(1, attempt_limit + 1):
                 await controller.wait_turn()
                 self.metrics.requests += 1
                 try:
@@ -151,7 +153,7 @@ class ResilientHttpClient:
                     ) as response:
                         body = await response.read()
                         self.metrics.bytes_received += len(body)
-                        if response.status in RETRYABLE_STATUSES and attempt < self.max_attempts:
+                        if response.status in RETRYABLE_STATUSES and attempt < attempt_limit:
                             self.metrics.retries += 1
                             await asyncio.sleep(self._retry_delay(response.headers, attempt))
                             continue
@@ -179,20 +181,18 @@ class ResilientHttpClient:
                     raise
                 except HttpStatusError as error:
                     last_error = error
-                    if error.status not in RETRYABLE_STATUSES or attempt >= self.max_attempts:
+                    if error.status not in RETRYABLE_STATUSES or attempt >= attempt_limit:
                         break
                     self.metrics.retries += 1
                     await asyncio.sleep(random.uniform(0, min(30.0, 0.5 * 2 ** (attempt - 1))))
                 except (TimeoutError, aiohttp.ClientError, FetchError) as error:
                     last_error = error
-                    if attempt >= self.max_attempts:
+                    if attempt >= attempt_limit:
                         break
                     self.metrics.retries += 1
                     await asyncio.sleep(random.uniform(0, min(30.0, 0.5 * 2 ** (attempt - 1))))
         self.metrics.failures += 1
-        raise FetchError(
-            f"request failed after {self.max_attempts} attempts: {url}"
-        ) from last_error
+        raise FetchError(f"request failed after {attempt_limit} attempts: {url}") from last_error
 
     @staticmethod
     def _retry_delay(headers: aiohttp.typedefs.LooseHeaders, attempt: int) -> float:

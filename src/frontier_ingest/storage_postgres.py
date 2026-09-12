@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from collections.abc import AsyncIterator, Mapping
 from datetime import datetime
 from typing import Any
 
@@ -71,7 +72,22 @@ CREATE TABLE IF NOT EXISTS dead_letters (
     payload_json JSONB,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS run_metrics (
+    id BIGSERIAL PRIMARY KEY,
+    run_type TEXT NOT NULL,
+    metrics_json JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 """
+
+
+def decode_json_object(value: Any) -> dict[str, object]:
+    """Normalize asyncpg JSONB values with or without a custom JSON codec."""
+    decoded = json.loads(value) if isinstance(value, str) else value
+    if not isinstance(decoded, Mapping):
+        raise TypeError("expected a JSON object from PostgreSQL")
+    return dict(decoded)
 
 
 class PostgresStore:
@@ -181,7 +197,7 @@ class PostgresStore:
                 id=row["id"],
                 queue_name=row["queue_name"],
                 dedupe_key=row["dedupe_key"],
-                payload=dict(row["payload_json"]),
+                payload=decode_json_object(row["payload_json"]),
                 attempts=row["attempts"],
                 lease_owner=owner,
             )
@@ -210,6 +226,38 @@ class PostgresStore:
                 item.id,
                 item.lease_owner,
             )
+
+    async def dead_letter(self, item: WorkItem, error: Exception) -> None:
+        record = item.payload.get("record") if isinstance(item.payload, dict) else None
+        record = record if isinstance(record, dict) else {}
+        source = record.get("source") if isinstance(record.get("source"), dict) else {}
+        record_key = record.get("recordKey", record.get("record_key"))
+        async with self.pool.acquire() as connection, connection.transaction():
+            await connection.execute(
+                """INSERT INTO dead_letters(stage, record_key, source_url, error_type,
+                error_message, payload_json) VALUES ($1, $2, $3, $4, $5, $6::jsonb)""",
+                "worker",
+                record_key,
+                source.get("url"),
+                type(error).__name__,
+                str(error),
+                json.dumps(item.payload),
+            )
+            await connection.execute(
+                """UPDATE work_items SET status='DEAD', last_error=$1, lease_owner=NULL,
+                lease_expires_at=NULL, updated_at=NOW() WHERE id=$2 AND lease_owner=$3""",
+                str(error),
+                item.id,
+                item.lease_owner,
+            )
+
+    async def queue_counts(self, queue_name: str) -> dict[str, int]:
+        async with self.pool.acquire() as connection:
+            rows = await connection.fetch(
+                "SELECT status, COUNT(*) AS count FROM work_items WHERE queue_name=$1 GROUP BY status",
+                queue_name,
+            )
+        return {str(row["status"]): int(row["count"]) for row in rows}
 
     async def set_checkpoint(
         self, source_name: str, partition_key: str, cursor: dict[str, object]
@@ -257,12 +305,29 @@ class PostgresStore:
         return [str(row["name"]) for row in rows if row["name"]]
 
     async def iter_payloads(self, record_type: RecordType) -> list[dict[str, object]]:
-        async with self.pool.acquire() as connection:
-            rows = await connection.fetch(
-                "SELECT payload_json FROM records WHERE record_type=$1 ORDER BY record_key",
-                record_type.value,
-            )
-        return [dict(row["payload_json"]) for row in rows]
+        payloads: list[dict[str, object]] = []
+        async for batch in self.iter_payload_batches(record_type):
+            payloads.extend(batch)
+        return payloads
+
+    async def iter_payload_batches(
+        self, record_type: RecordType, batch_size: int = 1_000
+    ) -> AsyncIterator[list[dict[str, object]]]:
+        after_key = ""
+        while True:
+            async with self.pool.acquire() as connection:
+                rows = await connection.fetch(
+                    """SELECT record_key, payload_json FROM records
+                    WHERE record_type=$1 AND record_key>$2
+                    ORDER BY record_key LIMIT $3""",
+                    record_type.value,
+                    after_key,
+                    max(1, batch_size),
+                )
+            if not rows:
+                return
+            after_key = str(rows[-1]["record_key"])
+            yield [decode_json_object(row["payload_json"]) for row in rows]
 
     async def upsert_entity_mapping(
         self, resolution: Resolution, resolver_version: str = "1.0"
@@ -307,3 +372,25 @@ class PostgresStore:
         async with self.pool.acquire() as connection:
             rows = await connection.fetch("SELECT * FROM entity_mappings ORDER BY raw_name")
         return [dict(row) for row in rows]
+
+    async def record_run_metrics(self, run_type: str, metrics: dict[str, object]) -> None:
+        async with self.pool.acquire() as connection:
+            await connection.execute(
+                "INSERT INTO run_metrics(run_type, metrics_json) VALUES ($1, $2::jsonb)",
+                run_type,
+                json.dumps(metrics),
+            )
+
+    async def run_metrics(self) -> list[dict[str, object]]:
+        async with self.pool.acquire() as connection:
+            rows = await connection.fetch(
+                "SELECT run_type, metrics_json, created_at FROM run_metrics ORDER BY id"
+            )
+        return [
+            {
+                "runType": row["run_type"],
+                "metrics": decode_json_object(row["metrics_json"]),
+                "createdAt": row["created_at"].isoformat(),
+            }
+            for row in rows
+        ]

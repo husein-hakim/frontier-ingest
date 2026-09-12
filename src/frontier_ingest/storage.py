@@ -4,6 +4,7 @@ import asyncio
 import json
 import sqlite3
 import uuid
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -73,6 +74,13 @@ CREATE TABLE IF NOT EXISTS dead_letters (
     error_type TEXT NOT NULL,
     error_message TEXT NOT NULL,
     payload_json TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS run_metrics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_type TEXT NOT NULL,
+    metrics_json TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
 """
@@ -211,6 +219,46 @@ class SQLiteStore:
         available = datetime.now(UTC) + timedelta(seconds=max(0, delay_seconds))
         await asyncio.to_thread(self._finish, item, "PENDING", error, available)
 
+    async def dead_letter(self, item: WorkItem, error: Exception) -> None:
+        await asyncio.to_thread(self._dead_letter, item, error)
+
+    def _dead_letter(self, item: WorkItem, error: Exception) -> None:
+        now = datetime.now(UTC).isoformat()
+        record = item.payload.get("record") if isinstance(item.payload, dict) else None
+        record = record if isinstance(record, dict) else {}
+        source = record.get("source") if isinstance(record.get("source"), dict) else {}
+        record_key = record.get("recordKey", record.get("record_key"))
+        with self._connect() as connection:
+            connection.execute(
+                """INSERT INTO dead_letters(stage, record_key, source_url, error_type,
+                error_message, payload_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    "worker",
+                    record_key,
+                    source.get("url"),
+                    type(error).__name__,
+                    str(error),
+                    json.dumps(item.payload, ensure_ascii=False),
+                    now,
+                ),
+            )
+            connection.execute(
+                """UPDATE work_items SET status='DEAD', last_error=?, lease_owner=NULL,
+                lease_expires_at=NULL, updated_at=? WHERE id=? AND lease_owner=?""",
+                (str(error), now, item.id, item.lease_owner),
+            )
+
+    async def queue_counts(self, queue_name: str) -> dict[str, int]:
+        return await asyncio.to_thread(self._queue_counts, queue_name)
+
+    def _queue_counts(self, queue_name: str) -> dict[str, int]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT status, COUNT(*) AS count FROM work_items WHERE queue_name=? GROUP BY status",
+                (queue_name,),
+            ).fetchall()
+        return {str(row["status"]): int(row["count"]) for row in rows}
+
     def _finish(
         self,
         item: WorkItem,
@@ -341,16 +389,62 @@ class SQLiteStore:
             rows = connection.execute("SELECT * FROM entity_mappings ORDER BY raw_name").fetchall()
         return [dict(row) for row in rows]
 
-    async def iter_payloads(self, record_type: RecordType) -> list[dict[str, object]]:
-        return await asyncio.to_thread(self._iter_payloads, record_type)
+    async def record_run_metrics(self, run_type: str, metrics: dict[str, object]) -> None:
+        await asyncio.to_thread(self._record_run_metrics, run_type, metrics)
 
-    def _iter_payloads(self, record_type: RecordType) -> list[dict[str, object]]:
+    def _record_run_metrics(self, run_type: str, metrics: dict[str, object]) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                "INSERT INTO run_metrics(run_type, metrics_json, created_at) VALUES (?, ?, ?)",
+                (run_type, json.dumps(metrics, ensure_ascii=False), datetime.now(UTC).isoformat()),
+            )
+
+    async def run_metrics(self) -> list[dict[str, object]]:
+        return await asyncio.to_thread(self._run_metrics)
+
+    def _run_metrics(self) -> list[dict[str, object]]:
         with self._connect() as connection:
             rows = connection.execute(
-                "SELECT payload_json FROM records WHERE record_type=? ORDER BY record_key",
-                (record_type.value,),
+                "SELECT run_type, metrics_json, created_at FROM run_metrics ORDER BY id"
             ).fetchall()
-        return [json.loads(row["payload_json"]) for row in rows]
+        return [
+            {
+                "runType": row["run_type"],
+                "metrics": json.loads(row["metrics_json"]),
+                "createdAt": row["created_at"],
+            }
+            for row in rows
+        ]
+
+    async def iter_payloads(self, record_type: RecordType) -> list[dict[str, object]]:
+        payloads: list[dict[str, object]] = []
+        async for batch in self.iter_payload_batches(record_type):
+            payloads.extend(batch)
+        return payloads
+
+    async def iter_payload_batches(
+        self, record_type: RecordType, batch_size: int = 1_000
+    ) -> AsyncIterator[list[dict[str, object]]]:
+        after_key = ""
+        while True:
+            rows = await asyncio.to_thread(
+                self._payload_batch, record_type, after_key, max(1, batch_size)
+            )
+            if not rows:
+                return
+            after_key = str(rows[-1][0])
+            yield [json.loads(payload) for _, payload in rows]
+
+    def _payload_batch(
+        self, record_type: RecordType, after_key: str, batch_size: int
+    ) -> list[tuple[str, str]]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """SELECT record_key, payload_json FROM records
+                WHERE record_type=? AND record_key>? ORDER BY record_key LIMIT ?""",
+                (record_type.value, after_key, batch_size),
+            ).fetchall()
+        return [(str(row["record_key"]), str(row["payload_json"])) for row in rows]
 
 
 def sqlite_path_from_url(database_url: str) -> Path:
