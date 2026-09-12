@@ -6,7 +6,7 @@
     "STARTUP": 1000,
     "PRODUCT": 1000,
     "RESEARCH_PAPER": 1000,
-    "JOB": 67,
+    "JOB": 69,
     "NEWS": 11
   },
   "queue": {
@@ -26,10 +26,10 @@
   },
   "sourceYields": {
     "jobs": {
-      "Arbeitnow": 35,
+      "Arbeitnow": 51,
       "Remote OK": 0,
       "Jobicy": 10,
-      "Himalayas": 4,
+      "Himalayas": 8,
       "Remotive": 0
     },
     "news": {
@@ -41,12 +41,12 @@
     }
   },
   "entityResolution": {
-    "mappingRows": 1573,
+    "mappingRows": 1584,
     "matched": 1008,
     "needsReview": 12,
-    "newEntity": 553,
+    "newEntity": 564,
     "productCanonicalNamesWritten": 29,
-    "jobCanonicalNamesWritten": 1
+    "jobCanonicalNamesWritten": 0
   },
   "llmResilienceDemo": {
     "simulation": true,

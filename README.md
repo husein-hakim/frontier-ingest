@@ -6,7 +6,7 @@ The design is called **Evidence-Gated Adaptive Ingestion**: parse structured sou
 
 ## Submission status
 
-The final 12 September 2026 dataset was produced by the durable pipeline, not by a fixture or hand-edited export. It contains 3,078 accepted records. The base catalog and signals passed through the queue; all 1,000 repository metrics and both time-sensitive lanes were refreshed immediately before export. The strict submission gate reports `submission_ready: true`.
+The final 12 September 2026 dataset was produced by the durable pipeline, not by a fixture or hand-edited export. It contains 3,080 accepted records. The base catalog and signals passed through the queue; all 1,000 repository metrics and both time-sensitive lanes were refreshed immediately before export. The strict submission gate reports `submission_ready: true`.
 
 Submission deliverables:
 
@@ -19,7 +19,7 @@ Submission deliverables:
 | Startups | 1,000 | 1,000 | 1,000 | 1,000 |
 | Genuine AI products | 1,000 | 1,000 | 1,000 | 1,000 |
 | Research papers with GitHub metrics | 1,000 | 1,000 | 1,000 | 1,000 |
-| Jobs proven fresh within 24 hours | 67 | 67 | 67 | 67 |
+| Jobs proven fresh within 24 hours | 69 | 69 | 69 | 69 |
 | News proven fresh within 24 hours | 11 | 11 | 11 | 11 |
 
 Fresh jobs and news naturally vary on each run. A record without sufficient freshness evidence is excluded. Product pricing remains null unless source text explicitly supports one of `FREE`, `FREEMIUM`, `PAID`, or `ENTERPRISE`; public visibility is not incorrectly treated as proof that a product is free.
@@ -214,3 +214,5 @@ The producer discovers all five verticals into PostgreSQL. Any number of workers
 - `reports/rendered-source-demo.json` — real local Chromium execution, allowlist, and raw-evidence proof.
 - `outputs/<run-id>/frontier-intelligence-data.xlsx` — verified six-tab workbook ready for native Google Sheets import.
 - `docs/submission-checklist.md` — final authenticated refresh and publication steps.
+- `docs/video-walkthrough.md` — seven-minute screen plan, word-for-word script, and reviewer Q&A.
+- `docs/submission-readiness-and-video-guide.html` — self-contained readiness and recording guide.

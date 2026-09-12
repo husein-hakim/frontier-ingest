@@ -1,0 +1,166 @@
+{
+  "surface": "report",
+  "manifest": {
+    "version": 1,
+    "surface": "report",
+    "title": "Frontier Ingest — Submission Readiness and Recording Guide",
+    "description": "A technical readiness assessment and evidence-backed recording plan for the FrontierAtlas AI Engineer submission.",
+    "generatedAt": "2026-09-12T09:09:38Z",
+    "cards": [
+      {
+        "id": "accepted_records",
+        "description": "All records in the final normalized export.",
+        "dataset": "summary",
+        "sourceId": "reference_run",
+        "metrics": [
+          { "label": "Accepted records", "field": "acceptedRecords", "format": "number" }
+        ]
+      },
+      {
+        "id": "github_metrics",
+        "description": "Paper repositories refreshed directly through GitHub GraphQL.",
+        "dataset": "summary",
+        "sourceId": "reference_run",
+        "metrics": [
+          { "label": "Direct GitHub metrics", "field": "githubMetrics", "format": "number" }
+        ]
+      },
+      {
+        "id": "tests",
+        "description": "Deterministic unit and integration checks passing locally.",
+        "dataset": "summary",
+        "sourceId": "reference_run",
+        "metrics": [
+          { "label": "Passing tests", "field": "passingTests", "format": "number" }
+        ]
+      },
+      {
+        "id": "quality_gate",
+        "description": "One indicates that every strict submission requirement passed.",
+        "dataset": "summary",
+        "sourceId": "reference_run",
+        "metrics": [
+          { "label": "Quality gate", "field": "qualityGate", "format": "number" }
+        ]
+      }
+    ],
+    "charts": [
+      {
+        "id": "record_counts",
+        "title": "Accepted records by dataset",
+        "subtitle": "Final 12 September snapshot; jobs and news are a rolling 24-hour cohort.",
+        "type": "horizontalBar",
+        "dataset": "record_counts",
+        "sourceId": "reference_run",
+        "encodings": {
+          "x": { "field": "dataset", "type": "nominal", "label": "Dataset" },
+          "y": { "field": "records", "type": "quantitative", "label": "Accepted records", "format": "number" },
+          "tooltip": [
+            { "field": "records", "type": "quantitative", "label": "Accepted records", "format": "number" },
+            { "field": "scope", "type": "text", "label": "Scope" }
+          ]
+        },
+        "xAxisTitle": "Dataset",
+        "yAxisTitle": "Accepted records",
+        "valueFormat": "number",
+        "layout": "wide"
+      }
+    ],
+    "tables": [],
+    "sources": [
+      { "id": "reference_run", "label": "Verified reference-run evidence", "path": "reports/reference-run.json" },
+      { "id": "video_walkthrough", "label": "Complete recording script", "path": "docs/video-walkthrough.md" },
+      { "id": "architecture", "label": "Three-page production architecture", "path": "architecture.pdf" }
+    ],
+    "blocks": [
+      {
+        "id": "technical_summary",
+        "type": "markdown",
+        "sourceId": "reference_run",
+        "body": "## Technical summary\n\n**The implementation and data are ready; final submission publication is pending one permission change.** The strict gate passes with 3,080 accepted records, all 1,000 paper metrics refreshed directly from GitHub, and 29 passing tests. The Google Sheet is synchronized and structurally verified, but must be changed from private to **Anyone with the link — Viewer** before the application link is submitted."
+      },
+      {
+        "id": "headline_metrics",
+        "type": "metric-strip",
+        "cardIds": ["accepted_records", "github_metrics", "tests", "quality_gate"]
+      },
+      {
+        "id": "record_mix_finding",
+        "type": "markdown",
+        "sourceId": "reference_run",
+        "body": "## The fixed catalog is complete and the signal lanes stay honest\n\nThe three catalog datasets each contain exactly 1,000 source-backed records. Jobs and news are rolling cohorts rather than fixed quotas: 69 jobs and 11 news items are currently inside the verified 24-hour window. This is the correct behavior because stale records are removed instead of being retained to make the output look larger."
+      },
+      {
+        "id": "record_mix_chart",
+        "type": "chart",
+        "chartId": "record_counts"
+      },
+      {
+        "id": "scope_and_definitions",
+        "type": "markdown",
+        "body": "## What ‘ready’ means in this review\n\n**Content-ready** means the code, tests, architecture, source lineage, public repository and refreshed Sheet data satisfy the assessment. **Submission-ready** additionally requires that an unauthenticated reviewer can open the Google Sheet. Record counts refer to accepted canonical records after freshness, schema, URL, uniqueness and evidence validation. The 500k result is a bounded-memory transformation microbenchmark, not an external-source throughput promise."
+      },
+      {
+        "id": "methodology",
+        "type": "markdown",
+        "body": "## The evidence-gated design is the strongest interview story\n\nThe recording should center on **Evidence-Gated Adaptive Ingestion**: deterministic structured extraction first, content-addressed raw storage, optional LLM parsing only for unresolved fields, and exact-quote validation before any model value is accepted. The supporting technical story is bounded batches, idempotent keys, PostgreSQL leases with `FOR UPDATE SKIP LOCKED`, conservative entity resolution, direct batched GitHub GraphQL enrichment, a strict freshness lane, and fail-closed quality checks."
+      },
+      {
+        "id": "recording_sequence_intro",
+        "type": "markdown",
+        "body": "## Record the proof in the order a reviewer will trust it\n\nStart with the finished outputs, then explain the architecture, show the small pieces of code that implement the unusual claims, and end by running the tests and quality gate. This prevents the video from becoming a code tour before the reviewer knows why the design matters."
+      },
+      {
+        "id": "recording_sequence",
+        "type": "markdown",
+        "body": "## Seven-minute recording sequence\n\n1. **0:00–0:35 — GitHub README:** frame the task and completed deliverables.\n2. **0:35–1:25 — Six-tab Google Sheet:** prove the output is real, linked, fresh and auditable.\n3. **1:25–2:05 — Architecture page 1:** explain Evidence-Gated Adaptive Ingestion.\n4. **2:05–2:55 — `pipeline.py`:** show streaming batches and the shared processing path.\n5. **2:55–3:35 — `orchestrator.py`:** show token selection plus 413 and 429 behavior.\n6. **3:35–4:55 — PostgreSQL store and mapping log:** explain leases, idempotency and conservative resolution.\n7. **4:55–6:05 — Architecture pages 2–3 and renderer:** explain 500k scale, storage and source-access policy.\n8. **6:05–7:00 — Terminal and README:** run the proof and close with the public links."
+      },
+      {
+        "id": "limitations",
+        "type": "markdown",
+        "body": "## Two limitations should be stated precisely\n\nThe 500k benchmark isolates the streaming transformation path and excludes network latency, external rate limits and PostgreSQL I/O. The deterministic LLM resilience demonstration exercises the real orchestration and evidence-gate code with simulated provider responses; no third-party provider key is stored in the repository. Neither limitation weakens the design when it is described accurately."
+      },
+      {
+        "id": "next_steps",
+        "type": "markdown",
+        "body": "## Recommended next steps\n\n1. Approve public view-only access for the Google Sheet and verify it in an unauthenticated window.\n2. Record the seven-minute walkthrough using the prepared word-for-word script.\n3. Upload the video as unlisted or viewable by link, then submit the Sheet, repository and video URLs together."
+      },
+      {
+        "id": "further_questions",
+        "type": "markdown",
+        "body": "## Further questions to prepare for\n\nBe ready to explain why pricing can remain null, why an LLM is not treated as an evidence source, how a crashed worker is recovered, why PostgreSQL remains canonical instead of a graph database, and what the 500k benchmark does and does not establish. Short answers for each are included in the recording script."
+      }
+    ]
+  },
+  "snapshot": {
+    "version": 1,
+    "generatedAt": "2026-09-12T09:09:38Z",
+    "status": "ready",
+    "datasets": {
+      "summary": [
+        { "acceptedRecords": 3080, "githubMetrics": 1000, "passingTests": 29, "qualityGate": 1 }
+      ],
+      "record_counts": [
+        { "dataset": "Startups", "records": 1000, "scope": "Fixed catalog" },
+        { "dataset": "Products", "records": 1000, "scope": "Fixed catalog" },
+        { "dataset": "Research papers", "records": 1000, "scope": "Fixed catalog" },
+        { "dataset": "Jobs", "records": 69, "scope": "Rolling 24-hour window" },
+        { "dataset": "News", "records": 11, "scope": "Rolling 24-hour window" }
+      ]
+    }
+  },
+  "sources": [
+    {
+      "id": "reference_run",
+      "query": {
+        "engine": "sqlite",
+        "sql": "SELECT record_type AS dataset, COUNT(*) AS records FROM records GROUP BY record_type ORDER BY record_type;",
+        "description": "Counts the final accepted canonical records at one row per record type.",
+        "executed_at": "2026-09-12T09:09:38Z",
+        "tables_used": ["records"],
+        "filters": ["Final submission database after the 24-hour signal refresh"],
+        "metric_definitions": ["Accepted records are persisted canonical records after source, schema, freshness, uniqueness and evidence checks."]
+      }
+    }
+  ]
+}
